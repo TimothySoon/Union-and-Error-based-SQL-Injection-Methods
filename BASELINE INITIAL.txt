@@ -1,0 +1,15 @@
+CREATE OR REPLACE PROCEDURE baseline_search_customer (
+    p_name IN VARCHAR2,
+    p_rc   OUT SYS_REFCURSOR
+) AS
+    v_sql VARCHAR2(4000);
+BEGIN
+    v_sql :=
+        'SELECT c.full_name, a.account_type, a.balance ' ||
+        'FROM customers c JOIN accounts a ON c.customer_id = a.customer_id ' ||
+        'WHERE c.full_name = ''' || p_name || '''';
+
+    DBMS_OUTPUT.PUT_LINE('SQL=' || v_sql);
+    OPEN p_rc FOR v_sql;
+END;
+/
