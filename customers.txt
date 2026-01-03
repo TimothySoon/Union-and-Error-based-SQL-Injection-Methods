@@ -1,0 +1,6 @@
+CREATE TABLE customers (
+    customer_id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    full_name   VARCHAR2(100) NOT NULL,
+    email       VARCHAR2(120) UNIQUE,
+    country     VARCHAR2(60)
+);

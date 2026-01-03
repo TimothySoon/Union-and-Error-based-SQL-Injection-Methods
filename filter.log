@@ -1,0 +1,348 @@
+SQL> @"C:\Users\rayha\Downloads\filter.sql"
+SQL> -- run_filter.sql
+SQL> SET SERVEROUTPUT ON SIZE UNLIMITED
+SQL> SET TIMING ON
+SQL> SET ECHO ON
+SQL> SET LINESIZE 200
+SQL> SET PAGESIZE 200
+SQL> 
+SQL> @@payloads.sql
+SQL> -- payloads.sql
+SQL> SET VERIFY OFF
+SQL> 
+SQL> -- ===== Error-based payloads =====
+SQL> DEFINE E1	= '''Ali Hassan'''
+SQL> DEFINE E2	= ''' OR ''1''=''1'''
+SQL> DEFINE E3	= ''' OR 1=1 --'''
+SQL> DEFINE E4	= ''' OR 1=2 --'''
+SQL> DEFINE E5	= '''Ali Hassan'' --'''
+SQL> DEFINE E6	= '''Ali Hassan'' + 1'''
+SQL> DEFINE E7	= ''' || UPPER(username) || '''
+SQL> DEFINE E8	= '''Ali Hassan'' AND 1=TO_NUMBER(''ABC'')'''
+SQL> DEFINE E9	= '''Ali Hassan'' SELECT'''
+SQL> DEFINE E10 = '''Ali Hassan'''
+SQL> 
+SQL> -- ===== UNION-based payloads =====
+SQL> DEFINE U1	= ''' UNION SELECT customer_id FROM customers --'''
+SQL> DEFINE U2	= ''' UNION SELECT customer_id, full_name, email, country FROM customers --'''
+SQL> DEFINE U3	= ''' UNION SELECT customer_id, full_name, email FROM customers --'''
+SQL> DEFINE U4	= ''' UNION SELECT full_name, customer_id, email FROM customers --'''
+SQL> DEFINE U5	= ''' UNION SELECT table_name, NULL, NULL FROM user_tables --'''
+SQL> DEFINE U6 = ''' UNION SELECT column_name, data_type, NULL FROM user_tab_columns WHERE table_name=''CUSTOMERS'' --'''
+SQL> DEFINE U7	= ''' UNION SELECT view_name, NULL, NULL FROM user_views --'''
+SQL> DEFINE U8	= ''' UNION SELECT staff_id, username, role_name FROM staff_users --'''
+SQL> DEFINE U9	= ''' UNION SELECT username, granted_role, NULL FROM user_role_privs --'''
+SQL> DEFINE U10 = ''' UNION SELECT NULL, NULL, NULL FROM dual --'''
+SQL> 
+SQL> VARIABLE rc REFCURSOR
+SQL> 
+SQL> PROMPT ===================================================
+===================================================
+SQL> PROMPT FILTER RUN (Weak Input Filtering) - CONTROL
+FILTER RUN (Weak Input Filtering) - CONTROL
+SQL> PROMPT ===================================================
+===================================================
+SQL> EXEC filter_search_customer('Ali Hassan', :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = 'Ali Hassan'                                                    
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+FULL_NAME                                                                                            ACCOUNT_TYPE                      BALANCE                                                          
+---------------------------------------------------------------------------------------------------- ------------------------------ ----------                                                          
+Ali Hassan                                                                                           SAVINGS                             25000                                                          
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT ===================================================
+===================================================
+SQL> PROMPT FILTER RUN - ERROR-BASED (E1..E10)
+FILTER RUN - ERROR-BASED (E1..E10)
+SQL> PROMPT ===================================================
+===================================================
+SQL> 
+SQL> PROMPT [E1]
+[E1]
+SQL> EXEC filter_search_customer(&E1, :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = 'Ali Hassan'                                                    
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E2]
+[E2]
+SQL> EXEC filter_search_customer(&E2, :rc);
+ERROR:
+ORA-01756: quoted string not properly terminated 
+
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E3]
+[E3]
+SQL> EXEC filter_search_customer(&E3, :rc);
+Blocked by filter.                                                                                                                                                                                      
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E4]
+[E4]
+SQL> EXEC filter_search_customer(&E4, :rc);
+Blocked by filter.                                                                                                                                                                                      
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E5]
+[E5]
+SQL> EXEC filter_search_customer(&E5, :rc);
+BEGIN filter_search_customer('Ali Hassan' --', :rc); END;
+
+*
+ERROR at line 1:
+ORA-06550: line 2, column 0: 
+PLS-00103: Encountered the symbol "end-of-file" when expecting one of the following: 
+) , * & | = - + < / > at in is mod remainder not null rem 
+returning with => .. <an exponent (**)> <> or != or ~= >= <= 
+<> and or default like like2 like4 likec as between error 
+from using || multiset member empty submultiset lax strict 
+without pretty ascii true false absent format allow truncate 
+
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E6]
+[E6]
+SQL> EXEC filter_search_customer(&E6, :rc);
+ERROR:
+ORA-01756: quoted string not properly terminated 
+
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E7]
+[E7]
+SQL> EXEC filter_search_customer(&E7, :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = ' || UPPER(username) || '                                       
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E8]
+[E8]
+SQL> EXEC filter_search_customer(&E8, :rc);
+ERROR:
+ORA-01756: quoted string not properly terminated 
+
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E9]
+[E9]
+SQL> EXEC filter_search_customer(&E9, :rc);
+ERROR:
+ORA-01756: quoted string not properly terminated 
+
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E10]
+[E10]
+SQL> EXEC filter_search_customer(&E10, :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = 'Ali Hassan'                                                    
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+FULL_NAME                                                                                            ACCOUNT_TYPE                      BALANCE                                                          
+---------------------------------------------------------------------------------------------------- ------------------------------ ----------                                                          
+Ali Hassan                                                                                           SAVINGS                             25000                                                          
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT ===================================================
+===================================================
+SQL> PROMPT FILTER RUN - UNION-BASED (U1..U10)
+FILTER RUN - UNION-BASED (U1..U10)
+SQL> PROMPT ===================================================
+===================================================
+SQL> 
+SQL> PROMPT [U1]
+[U1]
+SQL> EXEC filter_search_customer(&U1, :rc);
+Blocked by filter.                                                                                                                                                                                      
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+FULL_NA A B                                                                                                                                                                                             
+------- - -                                                                                                                                                                                             
+BLOCKED                                                                                                                                                                                                 
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U2]
+[U2]
+SQL> EXEC filter_search_customer(&U2, :rc);
+Blocked by filter.                                                                                                                                                                                      
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+FULL_NA A B                                                                                                                                                                                             
+------- - -                                                                                                                                                                                             
+BLOCKED                                                                                                                                                                                                 
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U3]
+[U3]
+SQL> EXEC filter_search_customer(&U3, :rc);
+Blocked by filter.                                                                                                                                                                                      
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+FULL_NA A B                                                                                                                                                                                             
+------- - -                                                                                                                                                                                             
+BLOCKED                                                                                                                                                                                                 
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U4]
+[U4]
+SQL> EXEC filter_search_customer(&U4, :rc);
+Blocked by filter.                                                                                                                                                                                      
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+FULL_NA A B                                                                                                                                                                                             
+------- - -                                                                                                                                                                                             
+BLOCKED                                                                                                                                                                                                 
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U5]
+[U5]
+SQL> EXEC filter_search_customer(&U5, :rc);
+Blocked by filter.                                                                                                                                                                                      
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+FULL_NA A B                                                                                                                                                                                             
+------- - -                                                                                                                                                                                             
+BLOCKED                                                                                                                                                                                                 
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U6]
+[U6]
+SQL> EXEC filter_search_customer(&U6, :rc);
+BEGIN filter_search_customer(' UNION SELECT column_name, data_type, NULL FROM user_tab_columns WHERE table_name='CUSTOMERS' --', :rc); END;
+
+                                                                                                                 *
+ERROR at line 1:
+ORA-06550: line 1, column 114: 
+PLS-00103: Encountered the symbol "CUSTOMERS" when expecting one of the following: 
+) , * & | = - + < / > at in is mod remainder not null rem 
+returning with => .. <an exponent (**)> <> or != or ~= >= <= 
+<> and or default like like2 like4 likec as between error 
+from using || multiset member empty submultiset lax strict 
+without pretty ascii true false absent format allow truncate 
+The symbol ", was inserted before "CUSTOMERS" to continue. 
+
+
+Elapsed: 00:00:00.01
+SQL> PRINT rc
+ERROR:
+ORA-24338: statement handle not executed 
+
+
+SP2-0625: Error printing variable "rc"
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U7]
+[U7]
+SQL> EXEC filter_search_customer(&U7, :rc);
+Blocked by filter.                                                                                                                                                                                      
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+FULL_NA A B                                                                                                                                                                                             
+------- - -                                                                                                                                                                                             
+BLOCKED                                                                                                                                                                                                 
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U8]
+[U8]
+SQL> EXEC filter_search_customer(&U8, :rc);
+Blocked by filter.                                                                                                                                                                                      
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+FULL_NA A B                                                                                                                                                                                             
+------- - -                                                                                                                                                                                             
+BLOCKED                                                                                                                                                                                                 
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U9]
+[U9]
+SQL> EXEC filter_search_customer(&U9, :rc);
+Blocked by filter.                                                                                                                                                                                      
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+FULL_NA A B                                                                                                                                                                                             
+------- - -                                                                                                                                                                                             
+BLOCKED                                                                                                                                                                                                 
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U10]
+[U10]
+SQL> EXEC filter_search_customer(&U10, :rc);
+Blocked by filter.                                                                                                                                                                                      
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+FULL_NA A B                                                                                                                                                                                             
+------- - -                                                                                                                                                                                             
+BLOCKED                                                                                                                                                                                                 
+
+Elapsed: 00:00:00.00
+SQL> SPOOL OFF

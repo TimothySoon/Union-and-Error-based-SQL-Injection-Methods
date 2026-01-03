@@ -1,0 +1,5 @@
+CREATE TABLE staff_users (
+    staff_id  NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    username  VARCHAR2(50) UNIQUE NOT NULL,
+    role_name VARCHAR2(30) NOT NULL
+);
