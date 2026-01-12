@@ -1,0 +1,175 @@
+CREATE USER sqli_lab IDENTIFIED BY "Lab12345"
+    DEFAULT TABLESPACE users
+    TEMPORARY TABLESPACE temp;
+
+GRANT CREATE SESSION,
+      CREATE TABLE,
+      CREATE PROCEDURE,
+      CREATE SEQUENCE,
+      CREATE VIEW
+TO sqli_lab;
+
+ALTER USER sqli_lab QUOTA UNLIMITED ON users;
+
+CONNECT sqli_lab/Lab12345@//localhost:1521/XEPDB1
+
+ALTER SESSION SET CONTAINER = XEPDB1;
+
+SET SERVEROUTPUT ON SIZE UNLIMITED
+SET TIMING ON
+SET LINESIZE 200
+SET PAGESIZE 200
+SET ECHO ON
+
+CREATE TABLE customers (
+    customer_id NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    full_name   VARCHAR2(100) NOT NULL,
+    email       VARCHAR2(120) UNIQUE,
+    country     VARCHAR2(60)
+);
+
+CREATE TABLE accounts (
+    account_id   NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    customer_id  NUMBER NOT NULL,
+    account_type VARCHAR2(30) NOT NULL,
+    balance      NUMBER(12,2) DEFAULT 0 NOT NULL,
+    CONSTRAINT fk_accounts_customer
+        FOREIGN KEY (customer_id)
+        REFERENCES customers(customer_id)
+);
+
+CREATE TABLE transactions (
+    txn_id     NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    account_id NUMBER NOT NULL,
+    txn_date   DATE DEFAULT SYSDATE NOT NULL,
+    amount     NUMBER(12,2) NOT NULL,
+    txn_type   VARCHAR2(20) NOT NULL,
+    CONSTRAINT fk_txn_account
+        FOREIGN KEY (account_id)
+        REFERENCES accounts(account_id)
+);
+
+CREATE TABLE staff_users (
+    staff_id  NUMBER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    username  VARCHAR2(50) UNIQUE NOT NULL,
+    role_name VARCHAR2(30) NOT NULL
+);
+
+CREATE INDEX idx_customers_name
+ON customers(full_name);
+
+CREATE INDEX idx_txn_account
+ON transactions(account_id);
+
+
+INSERT INTO customers (full_name, email, country)
+VALUES ('Ali Hassan', 'ali@email.com', 'Malaysia');
+
+INSERT INTO customers (full_name, email, country)
+VALUES ('Siti Aminah', 'siti@email.com', 'Malaysia');
+
+INSERT INTO customers (full_name, email, country)
+VALUES ('John Carter', 'john@email.com', 'USA');
+
+INSERT INTO accounts (customer_id, account_type, balance)
+SELECT customer_id, 'SAVINGS', 25000
+FROM customers
+WHERE full_name = 'Ali Hassan';
+
+INSERT INTO accounts (customer_id, account_type, balance)
+SELECT customer_id, 'CURRENT', 8000
+FROM customers
+WHERE full_name = 'Siti Aminah';
+
+INSERT INTO accounts (customer_id, account_type, balance)
+SELECT customer_id, 'SAVINGS', 56000
+FROM customers
+WHERE full_name = 'John Carter';
+
+
+INSERT INTO transactions (account_id, txn_date, amount, txn_type)
+SELECT account_id, SYSDATE - 2, -500, 'TRANSFER'
+FROM accounts
+WHERE balance = 25000;
+
+INSERT INTO transactions (account_id, txn_date, amount, txn_type)
+SELECT account_id, SYSDATE - 1, 1200, 'SALARY'
+FROM accounts
+WHERE balance = 25000;
+
+INSERT INTO transactions (account_id, txn_date, amount, txn_type)
+SELECT account_id, SYSDATE - 3, -2000, 'PURCHASE'
+FROM accounts
+WHERE balance = 56000;
+
+INSERT INTO staff_users (username, role_name)
+VALUES ('admin', 'DBA');
+
+INSERT INTO staff_users (username, role_name)
+VALUES ('support', 'STAFF');
+
+COMMIT;
+
+
+CREATE OR REPLACE PROCEDURE baseline_search_customer (
+    p_name IN VARCHAR2,
+    p_rc   OUT SYS_REFCURSOR
+) AS
+    v_sql VARCHAR2(4000);
+BEGIN
+    v_sql :=
+        'SELECT c.full_name, a.account_type, a.balance ' ||
+        'FROM customers c JOIN accounts a ON c.customer_id = a.customer_id ' ||
+        'WHERE c.full_name = ''' || p_name || '''';
+
+    DBMS_OUTPUT.PUT_LINE('SQL=' || v_sql);
+    OPEN p_rc FOR v_sql;
+END;
+/
+
+
+
+CREATE OR REPLACE PROCEDURE filter_search_customer (
+    p_name IN VARCHAR2,
+    p_rc   OUT SYS_REFCURSOR
+) AS
+    v_sql VARCHAR2(4000);
+BEGIN
+    IF REGEXP_LIKE(UPPER(p_name), 'UNION|--|/\*|\*/|;') THEN
+        DBMS_OUTPUT.PUT_LINE('Blocked by filter');
+        OPEN p_rc FOR
+            SELECT 'BLOCKED' AS full_name,
+                   NULL AS account_type,
+                   NULL AS balance
+            FROM dual;
+        RETURN;
+    END IF;
+
+    v_sql :=
+        'SELECT c.full_name, a.account_type, a.balance ' ||
+        'FROM customers c JOIN accounts a ON c.customer_id = a.customer_id ' ||
+        'WHERE c.full_name = ''' || p_name || '''';
+
+    DBMS_OUTPUT.PUT_LINE('SQL=' || v_sql);
+    OPEN p_rc FOR v_sql;
+END;
+/
+
+
+
+CREATE OR REPLACE PROCEDURE secure_search_customer (
+    p_name IN VARCHAR2,
+    p_rc   OUT SYS_REFCURSOR
+) AS
+BEGIN
+    OPEN p_rc FOR
+        'SELECT c.full_name, a.account_type, a.balance
+         FROM customers c
+         JOIN accounts a ON c.customer_id = a.customer_id
+         WHERE c.full_name = :x'
+    USING p_name;
+END;
+/
+
+
+
